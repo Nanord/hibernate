@@ -2,6 +2,7 @@ package gui;
 
 import model.Category;
 import model.Order;
+import model.Product;
 import model.User;
 import service.Factory;
 
@@ -13,12 +14,13 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyAdapter;
+import java.io.IOException;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
+import java.text.SimpleDateFormat;
+import java.util.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.event.KeyEvent;
-import java.util.Vector;
+import java.util.List;
 
 /**
  * Created by Nanord on 15.03.2018.
@@ -39,14 +41,22 @@ public class MainWindow extends JFrame{
     private JTable table;
     private JButton make;
     private JComboBox comboBoxCategory;
-    private JTable table1;
+    private JTable tableProduct;
+    private JButton clearOrder;
+    private JButton showOrder;
     private JScrollPane jSP;
 
     private User user;
-    private List<Order> orders;
+    private List<Category> categories;
+    private Order makeOrder;
+    private List<Product> products;
 
-    public MainWindow(User user) {
+    public MainWindow(final User user) {
         this.user = user;
+        makeOrder = new Order();
+        products = new ArrayList<Product>();
+        Product product = new Product();
+
         setContentPane(panel1);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setVisible(true);
@@ -74,10 +84,161 @@ public class MainWindow extends JFrame{
             }
         });
 
+        comboBoxCategory.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                String nameCategory = (String)comboBoxCategory.getSelectedItem();
+                createTableProduct(nameCategory);
+            }
+        });
+
+        make.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                orderMake();
+            }
+        });
+        clearOrder.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                makeOrder = new Order();
+            }
+        });
+        showOrder.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                String input;
+                if(makeOrder != null) {
+                    int i = 0;
+                    input = "Ваш заказ: \n";
+                    for (Product product:
+                            makeOrder.getProducts()) {
+                        input += i + " - " + product.getName() + "\n";
+                        i++;
+                    }
+                }
+                else {
+                    input = "Заказ пуст";
+                }
+                JOptionPane.showMessageDialog(null, input);
+            }
+        });
+    }
+
+    private void orderMake() {
+        try {
+            if(makeOrder == null) {
+                makeOrder = new Order();
+            }
+            if(makeOrder.getProducts().size() != 0) {
+                Date dateNow = new Date();
+                SimpleDateFormat formatForDateNow = new SimpleDateFormat("E yyyy.MM.dd 'и время' hh:mm:ss a zzz");
+                makeOrder.setDate(formatForDateNow.format(dateNow));
+                makeOrder.setUser(user);
+                makeOrder.setPickup(0);
+                makeOrder.setCash(0);
+                Factory.getOrderService().add(makeOrder);
+                makeOrder = null;
+                createTable();
+            }
+            else {
+                JOptionPane.showMessageDialog(null, "Вы не выбрали продукты");
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    private void createTableProduct(String nameCategory) {
+        Vector<String> header = new Vector<String>();
+        header.add("id");
+        header.add("Название");
+        header.add("Описание");
+        header.add("Цена");
+        header.add("Колличество");
+        header.add("");
+
+        Vector<String> id = new Vector<String>();
+        Vector<String> name = new Vector<String>();
+        Vector<String> description = new Vector<String>();
+        Vector<String> cost = new Vector<String>();
+        Vector<String> count = new Vector<String>();
+        Vector<String> buttonName = new Vector<String>();
+
+        final Category useCategory;
+        for (Category category:
+                categories) {
+            if(category.getName().equals(nameCategory)) {
+                useCategory = category;
+
+                for (Product product :
+                        useCategory.getProducts()) {
+                    id.add(Integer.toString(product.getId()));
+                    name.add(product.getName());
+                    description.add(product.getDescription());
+                    cost.add(Float.toString((float) product.getCost()));
+                    count.add(Integer.toString((int) product.getCount()));
+                    buttonName.add("Добавить");
+                }
+                DefaultTableModel tableModel = new DefaultTableModel();
+                tableModel.addColumn(header.get(0), id);
+                tableModel.addColumn(header.get(1), name);
+                tableModel.addColumn(header.get(2), description);
+                tableModel.addColumn(header.get(3), cost);
+                tableModel.addColumn(header.get(4), count);
+                tableModel.addColumn(header.get(5), buttonName);
+                tableProduct.setModel(tableModel);
+
+                Action delete = new AbstractAction() {
+                    public void actionPerformed(ActionEvent e) {
+                        JTable table = (JTable)e.getSource();
+                        int modelRow = Integer.valueOf( e.getActionCommand() );
+                        String id_product = (String) (((DefaultTableModel)tableProduct.getModel()).getValueAt(modelRow, 0));
+
+                        for (Product product:
+                                useCategory.getProducts()) {
+                            if(Integer.toString(product.getId()).equals(id_product)) {
+                                String input = null;
+                                while (true) {
+                                    Set<Order> orderSet = new HashSet<Order>();
+                                    orderSet.add(makeOrder);
+                                    product.setOrders(orderSet);
+                                    input = JOptionPane.showInputDialog("Введите кол-во:");
+                                    if(input == null) {
+                                        break;
+                                    }
+                                    int i = strToInt(input);
+                                    if(i != 0) {
+                                        for (int j = 0; j < i; j++)
+                                        {
+                                            System.out.println(product.getName() + " кол-во: " + input);
+                                            makeOrder.getProducts().add(product);
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                };
+                ButtonColumn buttonColumn = new ButtonColumn(tableProduct, delete, 5);
+                buttonColumn.setMnemonic(KeyEvent.VK_D);
+                break;
+            }
+        }
+    }
+
+    private int strToInt(String input) {
+        try {
+
+            final int i = Integer.parseInt(input);
+            return i;
+        } catch(NumberFormatException e) {
+            return 0;
+        } catch(NullPointerException e) {
+            return 0;
+        }
     }
 
     private void createComboBox() {
-        List<Category> categories = Factory.getCategoryService().getAll();
+        categories = Factory.getCategoryService().getAll();
+
 
         List<String> catigoriesName = new ArrayList<String>();
 
@@ -85,8 +246,12 @@ public class MainWindow extends JFrame{
              categories) {
                 catigoriesName.add(category.getName());
         }
-
         comboBoxCategory.setModel(new DefaultComboBoxModel(catigoriesName.toArray()));
+
+
+
+
+
 
 
   /*
@@ -111,7 +276,7 @@ public class MainWindow extends JFrame{
 
     }
 
-    private static ImageIcon createImageIcon(String path) {
+    /*private static ImageIcon createImageIcon(String path) {
         java.net.URL imgURL = MainWindow.class.getResource(path);
         if (imgURL != null) {
             return new ImageIcon(imgURL);
@@ -119,10 +284,10 @@ public class MainWindow extends JFrame{
             System.err.println("Couldn't find file: " + path);
             return null;
         }
-    }
+    }*/
 
     private void createTable() {
-        orders = Factory.getOrderService().getByUser(user);
+        final List<Order> orders = Factory.getOrderService().getByUser(user);
         Vector<String> header = new Vector<String>();
         header.add("Дата");
         header.add("Общая стоимость");
@@ -142,8 +307,8 @@ public class MainWindow extends JFrame{
             id.add(Integer.toString(order.getId()));
             date.add(order.getDate());
             pP.add(Float.toString(order.getPriceProduct()));
-            cash.add(Integer.toString(order.getCash()));
-            pickup.add(Integer.toString(order.getPickup()));
+            cash.add(order.getCash() == 0?"Нет":"Да");
+            pickup.add(order.getPickup() == 0?"Нет":"Да");
             buttonName.add("Подробнее");
         }
         DefaultTableModel tableModel = new DefaultTableModel();

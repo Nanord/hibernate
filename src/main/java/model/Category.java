@@ -30,6 +30,16 @@ public class Category extends Template{
         return "Категория - " + name;
     }
 
+    public String toStringProducts() {
+        String result = "Список продуктов:\n";
+        int i = 1;
+        for (Product product:
+                products) {
+            result += i + ":\n" + "id - " + product.getId() + ", name - " + product.getName() + "\n";
+        }
+        return result;
+    }
+
     @Override
     public String toString() {
         return "Category{" +

@@ -1,10 +1,12 @@
 package gui;
 
 import model.User;
+import service.Factory;
 import service.UserService;
 import javax.swing.*;
 import java.awt.event.*;
 import java.sql.SQLException;
+import java.util.Vector;
 
 public class Enter extends JFrame {
     private JPanel contentPane;
@@ -43,7 +45,7 @@ public class Enter extends JFrame {
         // call onCancel() on ESCAPE
         contentPane.registerKeyboardAction(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                onCancel();
+                System.exit(0);
             }
         }, KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT);
 
@@ -58,19 +60,47 @@ public class Enter extends JFrame {
     private void onOK() {
         if(Login.getText() != null && Password.getText() != null) {
             try {
-                UserService userService = new UserService();
-                User user = userService.getByEnter(Login.getText(), Password.getText());
+                User user = Factory.getUserService().getByEnter(Login.getText(), Password.getText());
                 if(user != null) {
-                    MainWindow mainWindow = new MainWindow(user);
-                    mainWindow.pack();
-                    mainWindow.setVisible(true);
+                    if(user.getRole().getId() == 1) {
+                        Object[] possibilities = {"Admin panel", "User panel"};
+                        String s = (String)JOptionPane.showInputDialog(
+                                null,
+                                "Выберите меню:",
+                                "Customized Dialog",
+                                JOptionPane.PLAIN_MESSAGE,
+                                null,
+                                possibilities,
+                                "Admin panel");
 
+                        if ((s != null) && (s.length() > 0)) {
+                            if(s.equals("Admin panel")) {
+                                adminMenu(user);
+                            } else {
+                                mainMenu(user);
+                            }
+                        }
+                    } else {
+                        mainMenu(user);
+                    }
                     dispose();
                 }
             } catch (SQLException ex) {
                 ex.printStackTrace();
             }
         }
+    }
+
+    private void adminMenu(User user) {
+        AdminMainWindow adminMainWindow = new AdminMainWindow(user);
+        adminMainWindow.pack();
+        adminMainWindow.setVisible(true);
+    }
+
+    private void mainMenu(User user) {
+        MainWindow mainWindow = new MainWindow(user);
+        mainWindow.pack();
+        mainWindow.setVisible(true);
     }
 
     private void onCancel() {
